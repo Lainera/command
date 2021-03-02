@@ -8,8 +8,9 @@ edition = "2018"
 default = []
 std-write = []
 rbf-write = ["ring_buffer"]
+deserialize = ["serde"]
 
 [dependencies]
 ring_buffer = { git = "https://github.com/lainera/ring_buffer", optional = true }
-
+serde = { version = "*", features = ["derive"], optional = true }
 

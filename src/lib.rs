@@ -9,6 +9,13 @@ mod std_write;
 #[cfg(feature = "rbf-write")]
 mod rbf_write;
 
+#[cfg(feature = "deserialize")]
+mod deserialize;
+
+#[cfg(feature = "deserialize")]
+use deserialize::Command;
+
+#[cfg(not(feature = "deserialize"))]
 pub enum Command<'a> {
     Constant {
         led_count: u16, 
