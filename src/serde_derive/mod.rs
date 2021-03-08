@@ -86,6 +86,7 @@ pub enum Command {
     },
     #[serde(with = "stream")]
     Stream(Vec<u8>),
+    #[serde(rename_all = "camelCase")]
     Pulse {
         led_count: u16,
         start: (u8, u8, u8),
