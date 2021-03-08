@@ -1,7 +1,7 @@
 #![no_std]
 
 use core::convert::From;
-use core::fmt::{Display, Result as FMTResult, Formatter};
+use core::fmt::{Display, Formatter, Result as FMTResult};
 
 #[cfg(feature = "serde_derive")]
 mod serde_derive;
@@ -39,7 +39,7 @@ impl From<&CommandError> for &'static str {
 }
 
 impl Display for CommandError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FMTResult {     
+    fn fmt(&self, f: &mut Formatter<'_>) -> FMTResult {
         f.write_str(self.into())
     }
 }
