@@ -161,7 +161,7 @@ mod tests {
             frames: 60,
             period: 2000,
         };
-        let as_string = "{\"type\":\"pulse\",\"led_count\":5,\"start\":[0,0,0],\"end\":[127,0,127],\"frames\":60,\"period\":2000}";
+        let as_string = "{\"type\":\"pulse\",\"ledCount\":5,\"start\":[0,0,0],\"end\":[127,0,127],\"frames\":60,\"period\":2000}";
         let serialized =
             serde_json::to_string(&command).expect("Failed to serialize pulse example");
         assert_eq!(as_string, serialized);
@@ -176,7 +176,7 @@ mod tests {
             frames: 60,
             period: 2000,
         };
-        let as_string = "{\"type\":\"pulse\",\"led_count\":5,\"start\":[0,0,0],\"end\":[127,0,127],\"frames\":60,\"period\":2000}";
+        let as_string = "{\"type\":\"pulse\",\"ledCount\":5,\"start\":[0,0,0],\"end\":[127,0,127],\"frames\":60,\"period\":2000}";
         let deserialized =
             serde_json::from_str(&as_string).expect("Failed to deserialize pulse example");
         assert_eq!(command, deserialized);
