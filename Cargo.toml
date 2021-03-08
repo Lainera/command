@@ -6,10 +6,11 @@ edition = "2018"
 
 [features]
 default = []
-std-write = []
+std-write = ["serde", "serde_json"]
 rbf-write = ["ring_buffer"]
+serde_derive = ["serde", "serde_json"]
 
 [dependencies]
 ring_buffer = { git = "https://github.com/lainera/ring_buffer", optional = true }
-
-
+serde = { version = "~1.0", features = ["derive"], optional = true }
+serde_json = { version = "~1.0.63", optional = true }
