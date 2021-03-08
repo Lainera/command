@@ -5,11 +5,10 @@ mod std_write;
 
 extern crate std;
 use std::vec::Vec;
-use serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize, de::DeserializeOwned};
 
-
+/// add custom serialization logic for self-describing formats for stream variant
 mod stream {
-    // adds some extra info to self-describing formats for stream variant
     use serde::{Serialize, Serializer, Deserializer, Deserialize, de::{Visitor, MapAccess, self}};
     use super::Vec;
     use core::fmt;
@@ -62,7 +61,7 @@ mod stream {
                 if bytes.len() % 3 == 0 { 
                     Ok(bytes)
                 } else {
-                    Err(de::Error::custom("Invalid length for bytes command"))
+                    Err(de::Error::custom("Byte length must be multiple of 3"))
                 }
             }
 
@@ -142,6 +141,42 @@ mod tests {
 
    #[test]
    fn pulse_ser() {
+       let command = Command::Pulse {
+           led_count: 5,
+           start: (0, 0, 0),
+           end: (127, 0, 127),
+           frames: 60,
+           period: 2000,
+       };
+       let as_string = "{\"type\":\"pulse\",\"led_count\":5,\"start\":[0,0,0],\"end\":[127,0,127],\"frames\":60,\"period\":2000}";
+       let serialized = serde_json::to_string(&command).expect("Failed to serialize pulse example");
+       assert_eq!(as_string, serialized);
+   }
 
+
+   #[test]
+   fn pulse_de() {
+       let command = Command::Pulse {
+           led_count: 5,
+           start: (0, 0, 0),
+           end: (127, 0, 127),
+           frames: 60,
+           period: 2000,
+       };
+       let as_string = "{\"type\":\"pulse\",\"led_count\":5,\"start\":[0,0,0],\"end\":[127,0,127],\"frames\":60,\"period\":2000}";
+       let deserialized = serde_json::from_str(&as_string).expect("Failed to deserialize pulse example");
+       assert_eq!(command, deserialized);
+   }
+
+   #[test]
+   #[should_panic]
+   fn garbled() {
+       let command: Command = serde_json::from_str(&"{\"not\":\"legit\"}").unwrap();
+   }
+
+   #[test]
+   #[should_panic(expected = "Byte length must be multiple of 3")]
+   fn wrong_byte_count() {
+       let command: Command = serde_json::from_str(&"{\"type\": \"stream\", \"bytes\": [127, 0]}").unwrap();
    }
 }
