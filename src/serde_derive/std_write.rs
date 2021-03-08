@@ -1,7 +1,9 @@
-use crate::Command;
+#![cfg(feature = "std-write")] 
 
-#[cfg(feature = "std-write")] extern crate std;
-impl<'a> Command<'a> {
+use crate::Command;
+extern crate std;
+
+impl Command {
     pub fn write_as_bytes<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<usize> {
         let size = self.size_in_bytes();
         writer.write(&(size as u16).to_be_bytes())?;
@@ -19,7 +21,7 @@ impl<'a> Command<'a> {
                 writer.write(&period.to_be_bytes())?;
                 writer.flush()?;
             },
-            Command::Stream(buf) => {
+            Command::Stream(ref buf) => {
                 writer.write(&[b's'])?;
                 writer.write(buf)?;
                 writer.flush()?;
