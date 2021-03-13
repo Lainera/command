@@ -1,10 +1,10 @@
 #![cfg(feature = "serde_derive")]
 
 #[cfg(feature = "std-write")]
-mod std_write;
+pub mod std_write;
 
 extern crate std;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::vec::Vec;
 
 /// add custom serialization logic for self-describing formats for stream variant

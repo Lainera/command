@@ -6,6 +6,9 @@ use core::fmt::{Display, Formatter, Result as FMTResult};
 #[cfg(feature = "serde_derive")]
 mod serde_derive;
 
+#[cfg(feature = "std-write")]
+pub use serde_derive::std_write;
+
 #[cfg(feature = "serde_derive")]
 pub use serde_derive::Command;
 
@@ -14,6 +17,9 @@ mod embedded;
 
 #[cfg(not(feature = "serde_derive"))]
 pub use embedded::Command;
+
+#[cfg(feature = "rbf-write")]
+use embedded::rbf_write;
 
 #[derive(Debug)]
 pub enum CommandError {

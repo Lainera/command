@@ -5,7 +5,7 @@ use core::convert::TryFrom;
 use core::fmt::{Display, Formatter, Result as FMTResult};
 
 #[cfg(feature = "rbf-write")]
-mod rbf_write;
+pub mod rbf_write;
 
 pub enum Command<'a> {
     Constant {
