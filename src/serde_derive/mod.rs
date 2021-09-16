@@ -185,13 +185,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn garbled() {
-        let command: Command = serde_json::from_str(&"{\"not\":\"legit\"}").unwrap();
+        let _: Command = serde_json::from_str(&"{\"not\":\"legit\"}").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "Byte length must be multiple of 3")]
     fn wrong_byte_count() {
-        let command: Command =
+        let _: Command =
             serde_json::from_str(&"{\"type\": \"stream\", \"bytes\": [127, 0]}").unwrap();
     }
 }
