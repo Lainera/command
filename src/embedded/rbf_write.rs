@@ -9,7 +9,6 @@ impl<'a> Command<'a> {
         writer: &mut W,
     ) -> Result<usize, <W as Write<u8>>::Error> {
         let size = self.size_in_bytes();
-        writer.write(&(size as u16).to_be_bytes())?;
         match *self {
             Command::Constant { led_count, colour } => {
                 writer.write(&[b'c'])?;
