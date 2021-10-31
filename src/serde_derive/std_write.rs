@@ -30,6 +30,10 @@ impl Command {
                 writer.write(&[b's'])?;
                 writer.write(buf)?;
                 writer.flush()?;
+            },
+            Command::Health => {
+                writer.write(&[b'h'])?;
+                writer.flush()?;
             }
         }
 

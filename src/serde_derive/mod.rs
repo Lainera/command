@@ -94,6 +94,7 @@ pub enum Command {
         frames: u8,
         period: u16,
     },
+    Health,
 }
 
 impl Command {
@@ -102,6 +103,7 @@ impl Command {
             Command::Constant { .. } => 6,
             Command::Stream(bytes) => bytes.len() + 1,
             Command::Pulse { .. } => 12,
+            Command::Health => 1,
         }
     }
 }
@@ -179,6 +181,22 @@ mod tests {
         let as_string = "{\"type\":\"pulse\",\"ledCount\":5,\"start\":[0,0,0],\"end\":[127,0,127],\"frames\":60,\"period\":2000}";
         let deserialized =
             serde_json::from_str(&as_string).expect("Failed to deserialize pulse example");
+        assert_eq!(command, deserialized);
+    }
+    
+    #[test]
+    fn health_ser() {
+        let command = Command::Health;
+        let as_string = "{\"type\":\"health\"}";
+        let serialized = serde_json::to_string(&command).expect("Failed to serialize health example");
+        assert_eq!(serialized, as_string);
+    }
+
+    #[test]
+    fn health_de() {
+        let command = Command::Health;
+        let as_string = "{\"type\":\"health\"}";
+        let deserialized = serde_json::from_str(&as_string).expect("Failed to deserialize health example");
         assert_eq!(command, deserialized);
     }
 

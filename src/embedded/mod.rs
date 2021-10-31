@@ -8,6 +8,7 @@ use core::fmt::{Display, Formatter, Result as FMTResult};
 pub mod rbf_write;
 
 pub enum Command<'a> {
+    Health,
     Constant {
         led_count: u16,
         colour: (u8, u8, u8),
@@ -30,6 +31,7 @@ impl<'a> Command<'a> {
             Command::Constant { .. } => 6,
             Command::Stream(slice) => slice.len() + 1,
             Command::Pulse { .. } => 12,
+            Command::Health => 1,
         }
     }
 
@@ -87,6 +89,7 @@ impl<'a> TryFrom<&'a [u8]> for Command<'a> {
                     led_count,
                 })
             }
+            b'h' => Ok(Command::Health),
             _ => Err(CommandError::InvalidHeader),
         }
     }
@@ -119,7 +122,8 @@ impl<'a> Display for Command<'a> {
                 writeln!(f, "s::({},{},{})", ff, fs, ft)?;
                 writeln!(f, "e::({},{},{})", sf, ss, st)?;
                 writeln!(f, "ct::{} fr::{} pr::{}\r", led_count, frames, period)?;
-            }
+            },
+            Command::Health => writeln!(f, "Command::Health")?
         }
         Ok(())
     }
