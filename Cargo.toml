@@ -5,12 +5,12 @@ authors = ["Lainera <fistlain@hotmail.com>"]
 edition = "2018"
 
 [features]
-default = ["owned"]
+default = ["owned", "serde_impl"]
 owned = []
 serde_impl = ["serde", "serde_json"]
 defmt_impl = ["defmt"]
 
 [dependencies]
-serde = { version = "~1.0", features = ["derive"], optional = true }
+serde = { version = "~1.0", features = [], optional = true }
 serde_json = { version = "~1.0.63", optional = true }
 defmt = { version = "~0.3", optional = true }

@@ -6,9 +6,14 @@ pub use embedded::*;
 #[cfg(feature = "owned")]
 pub use owned::*;
 
-
 #[cfg(feature = "owned")]
 mod owned;
+
+#[cfg(feature = "serde_impl")]
+pub mod serde_impl;
+
+#[cfg(feature = "serde_impl")]
+use serde_impl::*;
 
 mod error;
 mod embedded;
@@ -29,6 +34,7 @@ fn read_as_u16(slice: &[u8]) -> Result<u16, CommandError> {
     Ok(u16::from_be_bytes(tmp))
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Command<T> {
     Health,
     Constant {
