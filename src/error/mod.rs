@@ -4,6 +4,12 @@ mod defmt_derive;
 #[cfg(feature = "defmt_derive")]
 pub use defmt_derive::*;
 
+use core::fmt::{
+    Display, 
+    Formatter,
+    Result as FMTResult,
+};
+
 #[derive(Debug)]
 pub enum CommandError {
     InvalidHeader,

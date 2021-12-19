@@ -1,11 +1,14 @@
+#![cfg(feature = "owned")]
+extern crate std;
+use std::vec::Vec;
 use crate::{Command, CommandError, read_as_u16, read_colour};
 use core::convert::TryFrom;
 
-impl<'a> TryFrom<&'a [u8]> for Command<&'a [u8]> {
+impl<'a> TryFrom<&'a [u8]> for Command<Vec<u8>> {
     type Error = CommandError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        if value.len() == 0 {
+        if value.is_empty() {
             return Err(CommandError::MalformedPayload);
         }
 
@@ -15,7 +18,7 @@ impl<'a> TryFrom<&'a [u8]> for Command<&'a [u8]> {
                 if buffer.len() % 3 != 0 {
                     Err(CommandError::MalformedPayload)
                 } else {
-                    Ok(Command::Stream(buffer))
+                    Ok(Command::Stream(buffer.to_vec()))
                 }
             }
             b'c' => {

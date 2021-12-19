@@ -1,7 +1,7 @@
 {
 	"rust-analyzer":  {
 		"cargo": {
-			"features": ["std-write"] 
+			"features": ["owned"] 
 		}
 	}
 }

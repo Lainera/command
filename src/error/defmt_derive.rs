@@ -1,5 +1,4 @@
-#![cfg(feature = "defmt_derive")]
-
+#![cfg(feature = "defmt_impl")]
 use defmt::Format;
 
 impl Format for CommandError {
