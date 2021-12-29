@@ -18,25 +18,6 @@ pub use serde_impl::{ser, de};
 mod error;
 mod embedded;
 
-fn try_read_colour(slice: &[u8]) -> Result<(u8, u8, u8), CommandError> {
-    if slice.len() < 3 {
-        return Err(CommandError::MalformedPayload);
-    }
-    Ok((slice[0], slice[1], slice[2]))
-}
-
-fn try_read_u16(slice: &[u8]) -> Result<u16, CommandError> {
-    if slice.len() != 2 {
-        return Err(CommandError::MalformedPayload);
-    }
-    let mut tmp: [u8; 2] = [0; 2];
-    tmp.copy_from_slice(slice);
-    Ok(u16::from_be_bytes(tmp))
-}
-
-fn write_u16(v: u16, slice: &mut [u8]) -> Result<usize, CommandError> {
-todo!()
-}
 
 #[derive(Debug, PartialEq)]
 pub enum Command<T> {
@@ -69,23 +50,6 @@ impl<T: AsRef<[u8]>> Command<T> {
         }
     }
 
-    pub fn write_as_bytes(&self, buf: &mut [u8]) -> Result<usize, CommandError> {
-        let len = self.size_in_bytes();
-        if len > buf.len() {
-            return Err(CommandError::BufferTooSmall);
-        }
-        match self {
-            Command::Health => buf[0] = b'h',
-            Command::Constant { led_count, colour } => {
-                buf[0] = b'c';
-                buf[1..3].copy_from_slice(&led_count.to_be_bytes());
-            },
-            Command::Stream(_) => todo!(),
-            Command::Pulse { led_count, start, end, frames, period } => todo!(),
-        };
-
-        Ok(len)
-    }
 }
 
 impl<T> Display for Command<T> 

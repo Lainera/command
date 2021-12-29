@@ -10,7 +10,7 @@ use core::fmt::{
     Result as FMTResult,
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CommandError {
     InvalidHeader,
     MalformedPayload,
