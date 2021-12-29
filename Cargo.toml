@@ -1,11 +1,11 @@
 [package]
 name = "command"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Lainera <fistlain@hotmail.com>"]
 edition = "2018"
 
 [features]
-default = ["owned", "serde_impl"]
+default = []
 owned = []
 serde_impl = ["serde", "serde_json"]
 defmt_impl = ["defmt"]

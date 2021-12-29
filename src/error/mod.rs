@@ -1,8 +1,8 @@
-#[cfg(feature = "defmt_derive")]
-mod defmt_derive;
+#[cfg(feature = "defmt_impl")]
+mod defmt_impl;
 
-#[cfg(feature = "defmt_derive")]
-pub use defmt_derive::*;
+#[cfg(feature = "defmt_impl")]
+pub use defmt_impl::*;
 
 use core::fmt::{
     Display, 

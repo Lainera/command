@@ -1,6 +1,5 @@
 #![cfg(feature  = "serde_impl")]
-
-mod ser {
+pub mod ser {
     use serde::{Serialize, ser::SerializeMap};
     use crate::Command;
 
@@ -44,10 +43,7 @@ mod ser {
     }
 }
 
-mod de {
-    extern crate std;
-    use std::vec::Vec;
-
+pub mod de {
     use crate::Command;
     use serde::{Deserialize, de::{Visitor, self, MapAccess}};
     use core::{fmt::{Formatter, Result as FMTResult}, marker::PhantomData};
@@ -65,8 +61,7 @@ mod de {
         }
     }
 
-    #[derive(Default)]
-    struct CommandVisitor<'a> {
+    struct CommandVisitor<'a, T> {
         cmd_variant: CommandVariant,
         led_count: Option<u16>,
         colour: Option<(u8, u8, u8)>,
@@ -74,11 +69,28 @@ mod de {
         end: Option<(u8, u8, u8)>,
         frames: Option<u8>,
         period: Option<u16>,
-        bytes: Option<Vec<u8>>,
+        bytes: Option<T>,
         _pd: PhantomData<&'a u8>,
     }
 
-    impl<'a> CommandVisitor<'a> {
+    impl<'a, T> Default for CommandVisitor<'a, T> 
+    {
+        fn default() -> Self {
+        Self { 
+            cmd_variant: Default::default(), 
+            led_count: None, 
+            colour: None, 
+            start: None, 
+            end: None, 
+            frames: None, 
+            period: None, 
+            bytes: None, 
+            _pd: Default::default() 
+        }
+        }
+    }
+
+    impl<'a, T> CommandVisitor<'a, T> {
         fn resolve_cmd_type<'de, E: de::Error>(&mut self, mut map: impl MapAccess<'de, Error = E>) -> Result<(), E> {
             match map.next_value()? {
                 "constant" => self.cmd_variant = CommandVariant::Constant,
@@ -92,8 +104,11 @@ mod de {
         }
     }
 
-    impl<'de> Visitor<'de> for CommandVisitor<'de> {
-        type Value = Command<Vec<u8>>;
+    impl<'de: 'a, 'a, T> Visitor<'de> for CommandVisitor<'a, T> 
+        where
+            T: AsRef<[u8]> + Deserialize<'de>
+    {
+        type Value = Command<T>;
 
         fn expecting(&self, formatter: &mut Formatter) -> FMTResult {
             formatter.write_str("Map or sequence of bytes")
@@ -129,7 +144,7 @@ mod de {
                 },
                 CommandVariant::Stream => {
                     let bytes = self.bytes.ok_or_else(|| de::Error::missing_field("bytes"))?;
-                    if bytes.len() % 3 == 0 {
+                    if bytes.as_ref().len() % 3 == 0 {
                         Ok(Command::Stream(bytes))
                     } else {
                         Err(de::Error::custom("Byte length must be multiple of 3"))
@@ -143,13 +158,14 @@ mod de {
                     let led_count = self.led_count.ok_or_else(|| de::Error::missing_field("led_count"))?;
 
                     Ok(Command::Pulse { led_count, start, end, frames, period })
-
                 },
             }
         }
     } 
 
-    impl<'de> Deserialize<'de> for Command<Vec<u8>> 
+    impl<'de: 'a, 'a, T> Deserialize<'de> for Command<T>
+        where
+            T: AsRef<[u8]> + Deserialize<'de>
     {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where

@@ -13,7 +13,7 @@ mod owned;
 pub mod serde_impl;
 
 #[cfg(feature = "serde_impl")]
-use serde_impl::*;
+pub use serde_impl::{ser, de};
 
 mod error;
 mod embedded;
