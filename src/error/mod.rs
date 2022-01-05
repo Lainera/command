@@ -4,6 +4,12 @@ mod defmt_impl;
 #[cfg(feature = "defmt_impl")]
 pub use defmt_impl::*;
 
+#[cfg(feature = "owned")]
+mod owned;
+
+#[cfg(feature = "owned")]
+pub use owned::*;
+
 use core::fmt::{
     Display, 
     Formatter,
