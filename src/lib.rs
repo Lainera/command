@@ -36,6 +36,23 @@ pub enum Command<T> {
     },
 }
 
+impl<T: Clone> Clone for Command<T> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Health => Self::Health,
+            Self::Constant { led_count, colour } => Self::Constant { led_count: *led_count, colour: *colour },
+            Self::Stream(inner) => Self::Stream(inner.clone()),
+            Self::Pulse { led_count, start, end, frames, period } => Self::Pulse { 
+                led_count: *led_count, 
+                start: *start, 
+                end: *end, 
+                frames: *frames, 
+                period: *period 
+            },
+        }
+    }
+}
+
 impl<T: AsRef<[u8]>> Command<T> {
     /// Reports size of command variant in bytes
     /// Length of payload + 1 for command type
