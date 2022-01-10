@@ -1,60 +1,87 @@
-#![cfg(not(feature = "serde_derive"))]
-
-use crate::CommandError;
+use crate::{Command, CommandError};
 use core::convert::TryFrom;
-use core::fmt::{Display, Formatter, Result as FMTResult};
 
-#[cfg(feature = "rbf-write")]
-pub mod rbf_write;
-
-pub enum Command<'a> {
-    Constant {
-        led_count: u16,
-        colour: (u8, u8, u8),
-    },
-    Stream(&'a [u8]),
-    Pulse {
-        led_count: u16,
-        start: (u8, u8, u8),
-        end: (u8, u8, u8),
-        frames: u8,
-        period: u16,
-    },
+fn try_read_colour(slice: &[u8]) -> Result<(u8, u8, u8), CommandError> {
+    if slice.len() < 3 {
+        return Err(CommandError::MalformedPayload);
+    }
+    Ok((slice[0], slice[1], slice[2]))
 }
 
-impl<'a> Command<'a> {
-    /// Reports size of command variant in bytes
-    /// Length of payload + 1 for command type
-    pub fn size_in_bytes(&self) -> usize {
+fn try_read_u16(slice: &[u8]) -> Result<u16, CommandError> {
+    if slice.len() != 2 {
+        return Err(CommandError::MalformedPayload);
+    }
+    let mut tmp: [u8; 2] = [0; 2];
+    tmp.copy_from_slice(slice);
+    Ok(u16::from_be_bytes(tmp))
+}
+
+fn try_write_u16(v: u16, buf: &mut [u8]) -> Result<usize, CommandError> {
+    let size = core::mem::size_of::<u16>();
+    if buf.len() < size {
+        return Err(CommandError::BufferTooSmall);
+    }
+    buf[..2].copy_from_slice(&v.to_be_bytes());
+
+    Ok(size)
+}
+
+fn try_write_colour(colour: (u8, u8, u8), buf: &mut [u8]) -> Result<usize, CommandError> {
+    let size = 3;
+    if buf.len() < size {
+        return Err(CommandError::BufferTooSmall);
+    }
+    
+    buf[0] = colour.0;
+    buf[1] = colour.1;
+    buf[2] = colour.2;
+    Ok(size)
+}
+
+impl<T> Command<T> 
+    where
+        T: AsRef<[u8]>
+{
+    pub fn try_write_bytes(&self, buf: &mut dyn AsMut<[u8]>) -> Result<usize, CommandError> {
+        let buf = buf.as_mut();
+        let len = self.size_in_bytes();
+        if len > buf.len() {
+            return Err(CommandError::BufferTooSmall);
+        }
         match self {
-            Command::Constant { .. } => 6,
-            Command::Stream(slice) => slice.len() + 1,
-            Command::Pulse { .. } => 12,
-        }
+            Command::Health => buf[0] = b'h',
+            Command::Constant { led_count, colour } => {
+                buf[0] = b'c';
+                try_write_u16(*led_count, &mut buf[1..3])?;
+                try_write_colour(*colour, &mut buf[3..])?;
+            },
+            Command::Stream(bytes) => {
+                buf[0] = b's';
+                let bytes = bytes.as_ref();
+                let to_copy = bytes.len();
+                buf[1..to_copy+1].copy_from_slice(bytes);
+            },
+            Command::Pulse { led_count, start, end, frames, period } => {
+                buf[0] = b'p';
+                try_write_u16(*led_count, &mut buf[1..3])?;
+                try_write_colour(*start, &mut buf[3..6])?;
+                try_write_colour(*end, &mut buf[6..9])?;
+                buf[9] = *frames;
+                try_write_u16(*period, &mut buf[10..12])?;
+            },
+        };
+
+        Ok(len)
     }
 
-    fn read_colour(slice: &[u8]) -> Result<(u8, u8, u8), CommandError> {
-        if slice.len() < 3 {
-            return Err(CommandError::MalformedPayload);
-        }
-        Ok((slice[0], slice[1], slice[2]))
-    }
-
-    pub fn read_as_u16(slice: &[u8]) -> Result<u16, CommandError> {
-        if slice.len() != 2 {
-            return Err(CommandError::MalformedPayload);
-        }
-        let mut tmp: [u8; 2] = [0; 2];
-        tmp.copy_from_slice(slice);
-        Ok(u16::from_be_bytes(tmp))
-    }
 }
 
-impl<'a> TryFrom<&'a [u8]> for Command<'a> {
+impl<'a> TryFrom<&'a [u8]> for Command<&'a [u8]> {
     type Error = CommandError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        if value.len() == 0 {
+        if value.is_empty() {
             return Err(CommandError::MalformedPayload);
         }
 
@@ -68,16 +95,16 @@ impl<'a> TryFrom<&'a [u8]> for Command<'a> {
                 }
             }
             b'c' => {
-                let led_count = Self::read_as_u16(&buffer[..2])?;
-                let colour = Self::read_colour(&buffer[2..])?;
+                let led_count = try_read_u16(&buffer[..2])?;
+                let colour = try_read_colour(&buffer[2..])?;
                 Ok(Command::Constant { led_count, colour })
             }
             b'p' => {
-                let led_count = Self::read_as_u16(&buffer[..2])?;
-                let start_led = Self::read_colour(&buffer[2..5])?;
-                let end_led = Self::read_colour(&buffer[5..8])?;
+                let led_count = try_read_u16(&buffer[..2])?;
+                let start_led = try_read_colour(&buffer[2..5])?;
+                let end_led = try_read_colour(&buffer[5..8])?;
                 let frames = buffer[8];
-                let period = Self::read_as_u16(&buffer[9..11])?;
+                let period = try_read_u16(&buffer[9..11])?;
 
                 Ok(Command::Pulse {
                     start: start_led,
@@ -87,40 +114,143 @@ impl<'a> TryFrom<&'a [u8]> for Command<'a> {
                     led_count,
                 })
             }
+            b'h' => Ok(Command::Health),
             _ => Err(CommandError::InvalidHeader),
         }
     }
 }
 
-impl<'a> Display for Command<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FMTResult {
-        match &self {
-            Command::Constant { led_count, colour } => writeln!(
-                f,
-                "Command::Constant -> ({}, {}, {}) x {}\r",
-                colour.0, colour.1, colour.2, led_count
-            )?,
-            Command::Stream(slice) => writeln!(
-                f,
-                "Command::Stream -> {:#x} for {}\r",
-                slice.as_ptr() as u32,
-                slice.len()
-            )?,
-            Command::Pulse {
-                start,
-                end,
-                led_count,
-                frames,
-                period,
-            } => {
-                writeln!(f, "Command::Pulse\r")?;
-                let (ff, fs, ft) = start.clone();
-                let (sf, ss, st) = end.clone();
-                writeln!(f, "s::({},{},{})", ff, fs, ft)?;
-                writeln!(f, "e::({},{},{})", sf, ss, st)?;
-                writeln!(f, "ct::{} fr::{} pr::{}\r", led_count, frames, period)?;
-            }
-        }
-        Ok(())
+#[cfg(test)]
+mod tests {
+    use core::convert::TryFrom;
+
+    use crate::{
+        CommandError,
+        embedded::{
+            try_read_colour,
+            try_read_u16,
+            try_write_u16,
+            try_write_colour,
+        }, Command
+    };
+
+    #[test]
+    fn given_valid_slice_reads_u16() {
+        let val = 666_u16;
+        let parsed = try_read_u16(&val.to_be_bytes())
+            .expect("Deserialization fail");
+        assert_eq!(val, parsed);
+    }
+
+    #[test]
+    fn given_invalid_slice_returns_error() {
+        let val = 666_u16;
+        let outcome = try_read_u16(&val.to_be_bytes()[..1]);
+        assert!(outcome.is_err());
+        assert_eq!(outcome.unwrap_err(), CommandError::MalformedPayload);
+    }
+    
+    #[test]
+    fn given_valid_slice_reads_colour() {
+        let colour: &[u8] = &[254, 0, 254];
+        let parsed = try_read_colour(colour)
+            .expect("Deserialization fail");
+        assert_eq!((colour[0], colour[1], colour[2]), parsed);
+    }
+
+    #[test]
+    fn given_invalid_col_slice_returns_error() {
+        let colour: &[u8] = &[254, 0, 254];
+        let outcome = try_read_colour(&colour[..1]);
+        assert!(outcome.is_err());
+        assert_eq!(outcome.unwrap_err(), CommandError::MalformedPayload);
+    }
+
+    #[test]
+    fn given_buf_too_small_fails_to_write_u16() {
+        let mut buf = [0_u8; 1];
+        let outcome = try_write_u16(666, &mut buf);
+        assert!(outcome.is_err());
+        assert_eq!(outcome.unwrap_err(), CommandError::BufferTooSmall);
+    }
+    
+    #[test]
+    fn given_valid_buf_writes_u16() {
+        let val = 666_u16;
+        let mut buf = [0_u8; 2];
+        let outcome = try_write_u16(val, &mut buf);
+        assert!(outcome.is_ok());
+        assert_eq!(&val.to_be_bytes(), &buf[..]);
+    }
+    
+    #[test]
+    fn given_buf_too_small_fails_to_write_colour() {
+        let mut buf = [0_u8; 1];
+        let outcome = try_write_colour((1, 1, 1), &mut buf);
+        assert!(outcome.is_err());
+        assert_eq!(outcome.unwrap_err(), CommandError::BufferTooSmall);
+    }
+    
+    #[test]
+    fn given_valid_buf_writes_colour() {
+        let colour = (254, 0, 254);
+        let mut buf = [0_u8; 3];
+        let outcome = try_write_colour(colour, &mut buf);
+        assert!(outcome.is_ok());
+        assert_eq!(&[colour.0, colour.1, colour.2], &buf[..]);
+    }
+
+    #[test]
+    fn e2e_const() {
+        let cmd = Command::Constant {led_count: 257, colour: (254, 0, 254)};
+        let mut buf = [0_u8; 128];
+        let serialized = cmd.try_write_bytes(&mut buf);
+        assert!(serialized.is_ok());
+        let len = serialized.unwrap();
+        let deserialized = Command::try_from(&buf[..len]);
+        assert!(deserialized.is_ok());
+        assert_eq!(deserialized.unwrap(), cmd);
+    }
+    
+    #[test]
+    fn e2e_health() {
+        let cmd = Command::Health;
+        let mut buf = [0_u8; 128];
+        let serialized = cmd.try_write_bytes(&mut buf);
+        assert!(serialized.is_ok());
+        let len = serialized.unwrap();
+        let deserialized = Command::try_from(&buf[..len]);
+        assert!(deserialized.is_ok());
+        assert_eq!(deserialized.unwrap(), cmd);
+    }
+
+    #[test]
+    fn e2e_pulse() {
+        let cmd = Command::Pulse {
+            led_count: 300,
+            start: (0, 0, 0),
+            end: (255, 0, 0),
+            frames: 60,
+            period: 1000,
+        };
+        let mut buf = [0_u8; 128];
+        let serialized = cmd.try_write_bytes(&mut buf);
+        assert!(serialized.is_ok());
+        let len = serialized.unwrap();
+        let deserialized = Command::try_from(&buf[..len]);
+        assert!(deserialized.is_ok());
+        assert_eq!(deserialized.unwrap(), cmd);
+    }
+    
+    #[test]
+    fn e2e_stream() {
+        let cmd = Command::Stream([127, 127, 127, 0, 0, 0, 127, 127, 127, 0, 0, 0].as_ref());
+        let mut buf = [0_u8; 128];
+        let serialized = cmd.try_write_bytes(&mut buf);
+        assert!(serialized.is_ok());
+        let len = serialized.unwrap();
+        let deserialized = Command::try_from(&buf[..len]);
+        assert!(deserialized.is_ok());
+        assert_eq!(deserialized.unwrap(), cmd);
     }
 }

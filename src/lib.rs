@@ -1,77 +1,110 @@
 #![no_std]
-
-use core::convert::From;
+pub use error::*;
 use core::fmt::{Display, Formatter, Result as FMTResult};
+pub use embedded::*;
 
-#[cfg(feature = "serde_derive")]
-mod serde_derive;
+#[cfg(feature = "owned")]
+pub use owned::*;
 
-#[cfg(feature = "defmt_derive")]
-use defmt::Format;
+#[cfg(feature = "owned")]
+mod owned;
 
-#[cfg(feature = "std-write")]
-pub use serde_derive::std_write;
+#[cfg(feature = "serde_impl")]
+pub mod serde_impl;
 
-#[cfg(feature = "serde_derive")]
-pub use serde_derive::Command;
+#[cfg(feature = "serde_impl")]
+pub use serde_impl::{ser, de};
 
-#[cfg(not(feature = "serde_derive"))]
+mod error;
 mod embedded;
 
-#[cfg(not(feature = "serde_derive"))]
-pub use embedded::Command;
 
-#[cfg(feature = "rbf-write")]
-use embedded::rbf_write;
+#[derive(Debug, PartialEq)]
+pub enum Command<T> {
+    Health,
+    Constant {
+        led_count: u16,
+        colour: (u8, u8, u8),
+    },
+    Stream(T),
+    Pulse {
+        led_count: u16,
+        start: (u8, u8, u8),
+        end: (u8, u8, u8),
+        frames: u8,
+        period: u16,
+    },
+}
 
-#[cfg(feature = "defmt_derive")]
-impl Format for CommandError {
-    fn format(&self, f: defmt::Formatter) {
+impl<T: Clone> Clone for Command<T> {
+    fn clone(&self) -> Self {
         match self {
-            CommandError::InvalidHeader => defmt::write!(f, "CH"),
-            CommandError::MalformedPayload => defmt::write!(f, "CP"),
-            CommandError::BufferTooSmall => defmt::write!(f, "CS"),
+            Self::Health => Self::Health,
+            Self::Constant { led_count, colour } => Self::Constant { led_count: *led_count, colour: *colour },
+            Self::Stream(inner) => Self::Stream(inner.clone()),
+            Self::Pulse { led_count, start, end, frames, period } => Self::Pulse { 
+                led_count: *led_count, 
+                start: *start, 
+                end: *end, 
+                frames: *frames, 
+                period: *period 
+            },
         }
     }
 }
 
-#[cfg(feature = "defmt_derive")]
-impl<'a> Format for Command<'a> {
-    fn format(&self, f: defmt::Formatter) {
+impl<T: AsRef<[u8]>> Command<T> {
+    /// Reports size of command variant in bytes
+    /// Length of payload + 1 for command type
+    pub fn size_in_bytes(&self) -> usize {
         match self {
-            Command::Constant { led_count, colour } => defmt::write!(f, "CC::L({})::CO({},{},{})", led_count, colour.0, colour.1, colour.2),
-            Command::Stream(bytes) => defmt::write!(f, "CS::LB({})", bytes.len()),
-            Command::Pulse { led_count, start, end, frames, period } => defmt::write!(f, "CP::L({}))", led_count),
+            Command::Constant { .. } => 6,
+            Command::Stream(slice) => slice
+                .as_ref()
+                .len() + 1,
+            Command::Pulse { .. } => 12,
+            Command::Health => 1,
         }
     }
+
 }
 
-#[derive(Debug)]
-pub enum CommandError {
-    InvalidHeader,
-    MalformedPayload,
-    BufferTooSmall,
-}
-
-impl From<CommandError> for &'static str {
-    fn from(value: CommandError) -> Self {
-        (&value).into()
-    }
-}
-
-impl From<&CommandError> for &'static str {
-    fn from(value: &CommandError) -> Self {
-        match value {
-            CommandError::BufferTooSmall => "CS",
-            CommandError::InvalidHeader => "CH",
-            CommandError::MalformedPayload => "CP",
-        }
-    }
-}
-
-impl Display for CommandError {
+impl<T> Display for Command<T> 
+    where
+    T: AsRef<[u8]>
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> FMTResult {
-        f.write_str(self.into())
+        match &self {
+            Command::Constant { led_count, colour } => writeln!(
+                f,
+                "Command::Constant -> ({}, {}, {}) x {}\r",
+                colour.0, colour.1, colour.2, led_count
+            )?,
+            Command::Stream(slice) => {
+                let slice = slice.as_ref();
+                writeln!(
+                    f,
+                    "Command::Stream -> {:#x} for {}\r",
+                    slice.as_ptr() as usize,
+                    slice.len()
+                )?
+            },
+            Command::Pulse {
+                start,
+                end,
+                led_count,
+                frames,
+                period,
+            } => {
+                writeln!(f, "Command::Pulse\r")?;
+                let (ff, fs, ft) = start;
+                let (sf, ss, st) = end;
+                writeln!(f, "s::({},{},{})", ff, fs, ft)?;
+                writeln!(f, "e::({},{},{})", sf, ss, st)?;
+                writeln!(f, "ct::{} fr::{} pr::{}\r", led_count, frames, period)?;
+            },
+            Command::Health => writeln!(f, "Command::Health")?
+        }
+        Ok(())
     }
 }
-
