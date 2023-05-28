@@ -4,17 +4,13 @@ mod defmt_impl;
 #[cfg(feature = "defmt_impl")]
 pub use defmt_impl::*;
 
-#[cfg(feature = "owned")]
+#[cfg(all(feature = "owned", feature = "stderr"))]
 mod owned;
 
-#[cfg(feature = "owned")]
+#[cfg(all(feature = "owned", feature = "stderr"))]
 pub use owned::*;
 
-use core::fmt::{
-    Display, 
-    Formatter,
-    Result as FMTResult,
-};
+use core::fmt::{Display, Formatter, Result as FMTResult};
 
 #[derive(Debug, PartialEq)]
 pub enum CommandError {

@@ -1,7 +1,7 @@
 #![no_std]
-pub use error::*;
 use core::fmt::{Display, Formatter, Result as FMTResult};
 pub use embedded::*;
+pub use error::*;
 
 #[cfg(feature = "owned")]
 pub use owned::*;
@@ -13,11 +13,10 @@ mod owned;
 pub mod serde_impl;
 
 #[cfg(feature = "serde_impl")]
-pub use serde_impl::{ser, de};
+pub use serde_impl::{de, ser};
 
-mod error;
 mod embedded;
-
+mod error;
 
 #[derive(Debug, PartialEq)]
 pub enum Command<T> {
@@ -40,14 +39,23 @@ impl<T: Clone> Clone for Command<T> {
     fn clone(&self) -> Self {
         match self {
             Self::Health => Self::Health,
-            Self::Constant { led_count, colour } => Self::Constant { led_count: *led_count, colour: *colour },
+            Self::Constant { led_count, colour } => Self::Constant {
+                led_count: *led_count,
+                colour: *colour,
+            },
             Self::Stream(inner) => Self::Stream(inner.clone()),
-            Self::Pulse { led_count, start, end, frames, period } => Self::Pulse { 
-                led_count: *led_count, 
-                start: *start, 
-                end: *end, 
-                frames: *frames, 
-                period: *period 
+            Self::Pulse {
+                led_count,
+                start,
+                end,
+                frames,
+                period,
+            } => Self::Pulse {
+                led_count: *led_count,
+                start: *start,
+                end: *end,
+                frames: *frames,
+                period: *period,
             },
         }
     }
@@ -59,19 +67,16 @@ impl<T: AsRef<[u8]>> Command<T> {
     pub fn size_in_bytes(&self) -> usize {
         match self {
             Command::Constant { .. } => 6,
-            Command::Stream(slice) => slice
-                .as_ref()
-                .len() + 1,
+            Command::Stream(slice) => slice.as_ref().len() + 1,
             Command::Pulse { .. } => 12,
             Command::Health => 1,
         }
     }
-
 }
 
-impl<T> Display for Command<T> 
-    where
-    T: AsRef<[u8]>
+impl<T> Display for Command<T>
+where
+    T: AsRef<[u8]>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> FMTResult {
         match &self {
@@ -88,7 +93,7 @@ impl<T> Display for Command<T>
                     slice.as_ptr() as usize,
                     slice.len()
                 )?
-            },
+            }
             Command::Pulse {
                 start,
                 end,
@@ -102,8 +107,8 @@ impl<T> Display for Command<T>
                 writeln!(f, "s::({},{},{})", ff, fs, ft)?;
                 writeln!(f, "e::({},{},{})", sf, ss, st)?;
                 writeln!(f, "ct::{} fr::{} pr::{}\r", led_count, frames, period)?;
-            },
-            Command::Health => writeln!(f, "Command::Health")?
+            }
+            Command::Health => writeln!(f, "Command::Health")?,
         }
         Ok(())
     }
