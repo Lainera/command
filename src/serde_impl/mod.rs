@@ -1,64 +1,74 @@
-#![cfg(feature  = "serde_impl")]
+#![cfg(feature = "serde_impl")]
 pub mod ser {
-    use serde::{Serialize, ser::SerializeMap};
     use crate::Command;
+    use serde::{ser::SerializeMap, Serialize};
 
     impl<T> Serialize for Command<T>
-    where T: AsRef<[u8]> {
+    where
+        T: AsRef<[u8]>,
+    {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
-            S: serde::Serializer {
-                match self {
-                    Command::Health => {
-                        let mut state = serializer.serialize_map(Some(1))?;
-                        state.serialize_entry("type", "health")?;
-                        state.end()
-                    },
-                    Command::Constant { led_count, colour } => {
-                        let mut state = serializer.serialize_map(Some(3))?;
-                        state.serialize_entry("type", "constant")?;
-                        state.serialize_entry("led_count", led_count)?;
-                        state.serialize_entry("colour", colour)?;
-                        state.end()
-
-                    },
-                    Command::Stream(inner) => {
-                        let mut state = serializer.serialize_map(Some(2))?;
-                        state.serialize_entry("type", "stream")?;
-                        state.serialize_entry("bytes", inner.as_ref())?;
-                        state.end()
-                    },
-                    Command::Pulse { led_count, start, end, frames, period } => {
-                        let mut state = serializer.serialize_map(Some(6))?;
-                        state.serialize_entry("type", "pulse")?;
-                        state.serialize_entry("led_count", led_count)?;
-                        state.serialize_entry("start", start)?;
-                        state.serialize_entry("end", end)?;
-                        state.serialize_entry("frames", frames)?;
-                        state.serialize_entry("period", period)?;
-                        state.end()
-                    },
+            S: serde::Serializer,
+        {
+            match self {
+                Command::Health => {
+                    let mut state = serializer.serialize_map(Some(1))?;
+                    state.serialize_entry("type", "health")?;
+                    state.end()
                 }
+                Command::Constant { led_count, colour } => {
+                    let mut state = serializer.serialize_map(Some(3))?;
+                    state.serialize_entry("type", "constant")?;
+                    state.serialize_entry("led_count", led_count)?;
+                    state.serialize_entry("colour", colour)?;
+                    state.end()
+                }
+                Command::Stream(inner) => {
+                    let mut state = serializer.serialize_map(Some(2))?;
+                    state.serialize_entry("type", "stream")?;
+                    state.serialize_entry("bytes", inner.as_ref())?;
+                    state.end()
+                }
+                Command::Pulse {
+                    led_count,
+                    start,
+                    end,
+                    frames,
+                    period,
+                } => {
+                    let mut state = serializer.serialize_map(Some(6))?;
+                    state.serialize_entry("type", "pulse")?;
+                    state.serialize_entry("led_count", led_count)?;
+                    state.serialize_entry("start", start)?;
+                    state.serialize_entry("end", end)?;
+                    state.serialize_entry("frames", frames)?;
+                    state.serialize_entry("period", period)?;
+                    state.end()
+                }
+            }
         }
     }
 }
 
 pub mod de {
     use crate::Command;
-    use serde::{Deserialize, de::{Visitor, self, MapAccess}};
-    use core::{fmt::{Formatter, Result as FMTResult}, marker::PhantomData};
+    use core::{
+        fmt::{Formatter, Result as FMTResult},
+        marker::PhantomData,
+    };
+    use serde::{
+        de::{self, MapAccess, Visitor},
+        Deserialize,
+    };
 
+    #[derive(Default)]
     enum CommandVariant {
+        #[default]
         Health,
         Constant,
         Stream,
         Pulse,
-    }
-
-    impl Default for CommandVariant {
-        fn default() -> Self {
-            CommandVariant::Health
-        }
     }
 
     struct CommandVisitor<'a, T> {
@@ -73,40 +83,42 @@ pub mod de {
         _pd: PhantomData<&'a u8>,
     }
 
-    impl<'a, T> Default for CommandVisitor<'a, T> 
-    {
+    impl<'a, T> Default for CommandVisitor<'a, T> {
         fn default() -> Self {
-        Self { 
-            cmd_variant: Default::default(), 
-            led_count: None, 
-            colour: None, 
-            start: None, 
-            end: None, 
-            frames: None, 
-            period: None, 
-            bytes: None, 
-            _pd: Default::default() 
-        }
+            Self {
+                cmd_variant: Default::default(),
+                led_count: None,
+                colour: None,
+                start: None,
+                end: None,
+                frames: None,
+                period: None,
+                bytes: None,
+                _pd: Default::default(),
+            }
         }
     }
 
     impl<'a, T> CommandVisitor<'a, T> {
-        fn resolve_cmd_type<'de, E: de::Error>(&mut self, mut map: impl MapAccess<'de, Error = E>) -> Result<(), E> {
+        fn resolve_cmd_type<'de, E: de::Error>(
+            &mut self,
+            mut map: impl MapAccess<'de, Error = E>,
+        ) -> Result<(), E> {
             match map.next_value()? {
                 "constant" => self.cmd_variant = CommandVariant::Constant,
                 "pulse" => self.cmd_variant = CommandVariant::Pulse,
                 "health" => self.cmd_variant = CommandVariant::Health,
                 "stream" => self.cmd_variant = CommandVariant::Stream,
-                _ => return Err(de::Error::custom("Unexpected command type"))
+                _ => return Err(de::Error::custom("Unexpected command type")),
             }
 
             Ok(())
         }
     }
 
-    impl<'de: 'a, 'a, T> Visitor<'de> for CommandVisitor<'a, T> 
-        where
-            T: AsRef<[u8]> + Deserialize<'de>
+    impl<'de: 'a, 'a, T> Visitor<'de> for CommandVisitor<'a, T>
+    where
+        T: AsRef<[u8]> + Deserialize<'de>,
     {
         type Value = Command<T>;
 
@@ -116,13 +128,13 @@ pub mod de {
 
         fn visit_map<A>(mut self, mut map: A) -> Result<Self::Value, A::Error>
         where
-                A: serde::de::MapAccess<'de>, 
+            A: serde::de::MapAccess<'de>,
         {
             while let Some(key) = map.next_key()? {
                 match key {
                     "type" => {
                         self.resolve_cmd_type(&mut map)?;
-                    },
+                    }
                     "led_count" => self.led_count = map.next_value()?,
                     "start" => self.start = map.next_value()?,
                     "end" => self.end = map.next_value()?,
@@ -130,46 +142,80 @@ pub mod de {
                     "frames" => self.frames = map.next_value()?,
                     "period" => self.period = map.next_value()?,
                     "bytes" => self.bytes = map.next_value()?,
-                    _ => return Err(de::Error::unknown_field(key, &["type", "led_count", "start", "end", "colour", "frames", "period", "bytes"])),
+                    _ => {
+                        return Err(de::Error::unknown_field(
+                            key,
+                            &[
+                                "type",
+                                "led_count",
+                                "start",
+                                "end",
+                                "colour",
+                                "frames",
+                                "period",
+                                "bytes",
+                            ],
+                        ))
+                    }
                 }
             }
 
             match self.cmd_variant {
                 CommandVariant::Health => Ok(Command::Health),
                 CommandVariant::Constant => {
-                    let colour = self.colour.ok_or_else(|| de::Error::missing_field("colour"))?;
-                    let led_count = self.led_count.ok_or_else(|| de::Error::missing_field("led_count"))?;
+                    let colour = self
+                        .colour
+                        .ok_or_else(|| de::Error::missing_field("colour"))?;
+                    let led_count = self
+                        .led_count
+                        .ok_or_else(|| de::Error::missing_field("led_count"))?;
 
-                    Ok(Command::Constant {led_count, colour})
-                },
+                    Ok(Command::Constant { led_count, colour })
+                }
                 CommandVariant::Stream => {
-                    let bytes = self.bytes.ok_or_else(|| de::Error::missing_field("bytes"))?;
+                    let bytes = self
+                        .bytes
+                        .ok_or_else(|| de::Error::missing_field("bytes"))?;
                     if bytes.as_ref().len() % 3 == 0 {
                         Ok(Command::Stream(bytes))
                     } else {
                         Err(de::Error::custom("Byte length must be multiple of 3"))
                     }
-                },
+                }
                 CommandVariant::Pulse => {
-                    let start = self.start.ok_or_else(|| de::Error::missing_field("start"))?;
+                    let start = self
+                        .start
+                        .ok_or_else(|| de::Error::missing_field("start"))?;
                     let end = self.end.ok_or_else(|| de::Error::missing_field("end"))?;
-                    let frames = self.frames.ok_or_else(|| de::Error::missing_field("frames"))?;
-                    let period = self.period.ok_or_else(|| de::Error::missing_field("period"))?;
-                    let led_count = self.led_count.ok_or_else(|| de::Error::missing_field("led_count"))?;
+                    let frames = self
+                        .frames
+                        .ok_or_else(|| de::Error::missing_field("frames"))?;
+                    let period = self
+                        .period
+                        .ok_or_else(|| de::Error::missing_field("period"))?;
+                    let led_count = self
+                        .led_count
+                        .ok_or_else(|| de::Error::missing_field("led_count"))?;
 
-                    Ok(Command::Pulse { led_count, start, end, frames, period })
-                },
+                    Ok(Command::Pulse {
+                        led_count,
+                        start,
+                        end,
+                        frames,
+                        period,
+                    })
+                }
             }
         }
-    } 
+    }
 
     impl<'de: 'a, 'a, T> Deserialize<'de> for Command<T>
-        where
-            T: AsRef<[u8]> + Deserialize<'de>
+    where
+        T: AsRef<[u8]> + Deserialize<'de>,
     {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
-                D: serde::Deserializer<'de> 
+            D: serde::Deserializer<'de>,
         {
             deserializer.deserialize_map(CommandVisitor::default())
         }
@@ -254,21 +300,23 @@ mod tests {
             serde_json::from_str(as_str).expect("Failed to deserialize pulse example");
         assert_eq!(command, deserialized);
     }
-    
+
     #[test]
     fn health_ser() {
         let command: Command<Plh> = Command::Health;
-        let serialized = serde_json::to_string(&command).expect("Failed to serialize health example");
+        let serialized =
+            serde_json::to_string(&command).expect("Failed to serialize health example");
         assert_eq!(serialized, "{\"type\":\"health\"}");
     }
 
     #[test]
     fn health_de() {
         let command: Command<Plh> = Command::Health;
-        let deserialized = serde_json::from_str("{\"type\":\"health\"}").expect("Failed to deserialize health example");
+        let deserialized = serde_json::from_str("{\"type\":\"health\"}")
+            .expect("Failed to deserialize health example");
         assert_eq!(command, deserialized);
     }
-    
+
     #[test]
     #[should_panic]
     fn garbled() {

@@ -1,6 +1,4 @@
-#![cfg(feature = "owned")]
-
-extern crate std;
+#![cfg(all(feature = "owned", feature = "stderr"))]
 
 use crate::CommandError;
 
